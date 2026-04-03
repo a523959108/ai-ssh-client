@@ -6,6 +6,7 @@ from textual.widgets import (
 )
 from textual.containers import Container, Vertical, Horizontal
 from ..app import AISSHApp
+from .ai_settings import AISettingsScreen
 from ai_ssh_client.config.settings import ConfigManager, ConnectionConfig
 from ai_ssh_client.ssh.connection import SSHConnection
 
@@ -28,6 +29,7 @@ class ConnectScreen(Screen):
             Horizontal(
                 Button("New Connection", id="new-connection"),
                 Button("Quick Connect", id="quick-connect"),
+                Button("AI Settings", id="ai-settings"),
                 classes="buttons"
             ),
             id="connect-container"

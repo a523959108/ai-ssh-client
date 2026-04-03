@@ -4,6 +4,7 @@ from textual.widgets import Header, Footer, Static
 from ..config.settings import ConfigManager
 from .screens.connect import ConnectScreen
 from .screens.terminal import TerminalScreen
+from .screens.ai_settings import AISettingsScreen
 
 class AISSHApp(App):
     """AI-enhanced SSH Client"""
@@ -12,6 +13,7 @@ class AISSHApp(App):
     BINDINGS = [
         ("q", "quit", "Quit"),
         ("ctrl+b", "toggle_sidebar", "Toggle Sidebar"),
+        ("ctrl+a", "ai_settings", "AI Settings"),
     ]
     
     CSS_PATH = "app.tcss"
@@ -28,6 +30,10 @@ class AISSHApp(App):
     def connect_to_host(self, connection_config) -> None:
         """Switch to terminal screen after connection"""
         self.push_screen(TerminalScreen(connection_config, self.config_manager))
+
+    def action_ai_settings(self) -> None:
+        """Open AI settings screen"""
+        self.push_screen(AISettingsScreen(self.config_manager))
 
 if __name__ == "__main__":
     app = AISSHApp()
