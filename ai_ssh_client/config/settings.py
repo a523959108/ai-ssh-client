@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 AIProvider = Literal["openai", "ollama", "openai_compatible"]
 
+ProtocolType = Literal["ssh", "mosh", "telnet", "sftp"]
+
 class OpenAIConfig(BaseModel):
     api_key: str = ""
     model: str = "gpt-3.5-turbo"
@@ -16,7 +18,7 @@ class OllamaConfig(BaseModel):
 
 class OpenAICompatibleConfig(BaseModel):
     """For OpenAI-compatible APIs like:
-    - 通义千问 (https://dashscope.aliyun.com/compatibility/v1)
+    - 通义千问 (https://dashscope.aliyuncs.com/compatibility/v1)
     - 文心一言 (https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat)
     - Claude Anthropic (via openai proxy)
     - Gemini Google (via openai proxy)
@@ -34,24 +36,52 @@ class AIConfig(BaseModel):
     ollama: OllamaConfig = OllamaConfig()
     openai_compatible: OpenAICompatibleConfig = OpenAICompatibleConfig()
 
+class TerminalThemeConfig(BaseModel):
+    """Per-connection terminal theme settings"""
+    foreground: str = "#ffffff"
+    background: str = "#0a0a0a"
+    cursor: str = "#ffffff"
+    selection: str = "#444444"
+    font_size: int = 14
+    font_family: str = "Menlo, Monaco, Consolas, monospace"
+
 class ConnectionConfig(BaseModel):
     name: str
+    protocol: ProtocolType = "ssh"
     host: str
-    port: int = 22
-    username: str
+    port: Optional[int] = None  # None means use default port for protocol
+    username: Optional[str] = None
     auth_type: Literal["password", "key", "certificate", "agent"] = "key"
     password: Optional[str] = None
     key_path: str = "~/.ssh/id_rsa"
     cert_path: Optional[str] = "~/.ssh/id_rsa-cert.pub"
+    # Port forwarding
+    local_port_forward: Optional[str] = None  # format: local_port:remote_host:remote_port
+    remote_port_forward: Optional[str] = None
+    # Custom theme for this connection
+    custom_theme: Optional[TerminalThemeConfig] = None
+    # Saved commands for quick access
+    saved_commands: List[str] = Field(default_factory=list)
 
-class ThemeConfig(BaseModel):
+class FavoriteCommand(BaseModel):
+    """Saved favorite command/script for quick execution"""
+    name: str
+    command: str
+    description: str = ""
+    connection_filter: Optional[str] = None  # Only show for this connection pattern
+
+class GlobalThemeConfig(BaseModel):
     mode: Literal["dark", "light"] = "dark"
     accent_color: str = "blue"
+    default_font_size: int = 14
+    default_font_family: str = "Menlo, Monaco, Consolas, monospace"
 
 class AppConfig(BaseModel):
     ai: AIConfig = AIConfig()
     connections: List[ConnectionConfig] = Field(default_factory=list)
-    theme: ThemeConfig = ThemeConfig()
+    theme: GlobalThemeConfig = GlobalThemeConfig()
+    favorite_commands: List[FavoriteCommand] = Field(default_factory=list)
+    command_history: List[str] = Field(default_factory=list)
 
 class ConfigManager:
     def __init__(self, config_path: str = "config.json"):

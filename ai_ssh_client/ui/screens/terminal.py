@@ -6,8 +6,8 @@ from textual.widgets import (
 )
 from textual.containers import Horizontal
 from ai_ssh_client.config.settings import ConfigManager, ConnectionConfig
-from ai_ssh_client.ssh.connection import SSHConnection
-from ai_ssh_client.ssh.session import SSHSession
+from ai_ssh_client.protocols.base import BaseProtocol
+from ai_ssh_client.protocols.factory import create_protocol
 from ai_ssh_client.ai import create_ai_client
 from ai_ssh_client.ai.base import BaseAIClient
 from ai_ssh_client.ai.planner import (
@@ -52,24 +52,28 @@ class TerminalScreen(Screen):
     }
 
     #ai-output {
-        height: 60%;
+        height: 50%;
         border: solid yellow;
     }
 
     #ai-goal-input {
-        height: 10%;
+        height: 8%;
     }
 
     #ai-command-input {
-        height: 10%;
+        height: 8%;
     }
 
     #ai-buttons {
-        height: 10%;
+        height: 8%;
     }
 
     #ai-buttons-single {
-        height: 10%;
+        height: 8%;
+    }
+
+    #ai-buttons-fav {
+        height: 8%;
     }
 
     #status-text {
@@ -93,8 +97,9 @@ class TerminalScreen(Screen):
         super().__init__()
         self.connection_config = connection_config
         self.config_manager = config_manager
-        self.connection = SSHConnection(connection_config)
-        self.session = None  # type: Optional[SSHSession]
+        self.protocol = create_protocol(connection_config)
+        self.protocol.output_callback = self._on_terminal_output
+        self.protocol.command_complete_callback = self._check_command_complete
         self.ai_client = None  # type: Optional[BaseAIClient]
         self.ai_client = create_ai_client(config_manager.config)
         self.ai_visible = False
@@ -128,6 +133,12 @@ class TerminalScreen(Screen):
                     Button("Troubleshoot", id="troubleshoot"),
                     id="ai-buttons-single"
                 ),
+                Horizontal(
+                    Button("Saved Commands", id="favorites"),
+                    Button("History", id="command-history"),
+                    Button("Add Current", id="add-current-fav"),
+                    id="ai-buttons-fav"
+                ),
                 id="ai-panel"
             ),
             id="main-container"
@@ -136,17 +147,15 @@ class TerminalScreen(Screen):
 
     def on_mount(self) -> None:
         """Mount the screen"""
-        success, message = self.connection.connect()
+        success, message = self.protocol.connect()
         if not success:
             self.notify(message, severity="error")
             self.app.pop_screen()
             return
 
-        self.session = SSHSession(self.connection)
-        self.session.output_callback = self._on_terminal_output
         width = self.query_one("#terminal-output").size.width
         height = self.query_one("#terminal-output").size.height
-        if not self.session.start(width=width, height=height):
+        if not self.protocol.start(width=width, height=height):
             self.notify("Failed to start session", severity="error")
             self.app.pop_screen()
 
@@ -169,8 +178,12 @@ class TerminalScreen(Screen):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission"""
         if event.input.id == "terminal-input":
-            if self.session:
-                self.session.send_input(event.value + "\n")
+            if self.protocol:
+                self.protocol.send_input(event.value + "\n")
+                # Add command to history
+                if event.value.strip():
+                    self.config_manager.config.command_history.append(event.value.strip())
+                    self.config_manager.save()
             event.input.value = ""
         elif event.input.id == "ai-command-input":
             self._generate_ai_command(event.value)
@@ -195,10 +208,18 @@ class TerminalScreen(Screen):
             if input_widget.value:
                 self._generate_execution_plan(input_widget.value)
                 input_widget.value = ""
-        elif event.button.id == "start-auto":
-            self._start_auto_execution()
-        elif event.button.id == "step-mode":
-            self._execute_next_step()
+         elif event.button.id == "start-auto":
+             self._start_auto_execution()
+         elif event.button.id == "step-mode":
+             self._execute_next_step()
+         elif event.button.id == "favorites":
+             from ai_ssh_client.ui.screens.favorites import FavoritesScreen
+             def on_select = lambda cmd: self._execute_favorite(cmd)
+             self.app.push_screen(FavoritesScreen(self.config_manager, on_select)
+         elif event.button.id == "command-history":
+             self._show_command_history()
+         elif event.button.id == "add-current-fav":
+             self._add_current_to_favorites()
 
     def _update_status(self, text: str) -> None:
         """Update status bar text"""
@@ -261,9 +282,9 @@ class TerminalScreen(Screen):
         self._update_status(get_plan_status(self.automation_plan))
         self._display_plan(self.automation_plan)
 
-        if self.session:
+        if self.protocol:
             self._buffer = ""
-            self.session.send_input(step.command + "\n")
+            self.protocol.send_input(step.command + "\n")
 
     def _check_command_complete(self) -> None:
         """Called after command finishes to mark step complete"""

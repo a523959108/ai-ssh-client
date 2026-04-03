@@ -8,7 +8,7 @@ from textual.containers import Container, Vertical, Horizontal
 from ..app import AISSHApp
 from .ai_settings import AISettingsScreen
 from ai_ssh_client.config.settings import ConfigManager, ConnectionConfig
-from ai_ssh_client.ssh.connection import SSHConnection
+from ai_ssh_client.protocols.factory import create_protocol
 
 class ConnectScreen(Screen):
     """Connection selection screen"""
@@ -50,8 +50,8 @@ class ConnectScreen(Screen):
             self._try_connect(connection_config)
 
     def _try_connect(self, connection_config: ConnectionConfig) -> None:
-        """Attempt SSH connection"""
-        conn = SSHConnection(connection_config)
+        """Attempt connection"""
+        conn = create_protocol(connection_config)
         success, message = conn.connect()
         if success:
             self.app.connect_to_host(connection_config)
@@ -71,8 +71,14 @@ class NewConnectionScreen(Screen):
             Static("New Connection", classes="title"),
             Vertical(
                 Horizontal(Label("Name:"), Input(placeholder="Connection name", id="name")),
+                Horizontal(Label("Protocol:"), Select([
+                    ("SSH", "ssh"),
+                    ("Mosh", "mosh"),
+                    ("Telnet", "telnet"),
+                    ("SFTP", "sftp")
+                ], id="protocol")),
                 Horizontal(Label("Host:"), Input(placeholder="hostname or IP", id="host")),
-                Horizontal(Label("Port:"), Input(value="22", id="port")),
+                Horizontal(Label("Port:"), Input(placeholder="auto", id="port")),
                 Horizontal(Label("Username:"), Input(placeholder="username", id="username")),
                 Horizontal(Label("Auth:"), Select([
                     ("SSH Key", "key"), 
@@ -102,8 +108,10 @@ class NewConnectionScreen(Screen):
 
     def _save_connection(self) -> None:
         name = self.query_one("#name", Input).value
+        protocol = self.query_one("#protocol", Select).value
         host = self.query_one("#host", Input).value
-        port = int(self.query_one("#port", Input).value or "22")
+        port_val = self.query_one("#port", Input).value
+        port = int(port_val) if port_val else None
         username = self.query_one("#username", Input).value
         auth_type = self.query_one("#auth_type", Select).value
         key_path = self.query_one("#key_path", Input).value
@@ -111,6 +119,7 @@ class NewConnectionScreen(Screen):
 
         conn = ConnectionConfig(
             name=name,
+            protocol=protocol,
             host=host,
             port=port,
             username=username,
