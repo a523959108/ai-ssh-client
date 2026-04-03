@@ -4,6 +4,7 @@ from typing import Optional
 from .base import BaseAIClient
 from .openai_client import OpenAILLMClient
 from .ollama_client import OllamaClient
+from .openai_compatible import OpenAICompatibleClient
 from ..config.settings import AppConfig, AIProvider
 
 def create_ai_client(config: AppConfig) -> Optional[BaseAIClient]:
@@ -17,6 +18,11 @@ def create_ai_client(config: AppConfig) -> Optional[BaseAIClient]:
         return None
     elif provider == "ollama":
         client = OllamaClient(config.ai.ollama)
+        if client.is_available():
+            return client
+        return None
+    elif provider == "openai_compatible":
+        client = OpenAICompatibleClient(config.ai.openai_compatible)
         if client.is_available():
             return client
         return None

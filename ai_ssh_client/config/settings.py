@@ -1,9 +1,9 @@
 import json
 import os
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 
-AIProvider = Literal["openai", "ollama"]
+AIProvider = Literal["openai", "ollama", "openai_compatible"]
 
 class OpenAIConfig(BaseModel):
     api_key: str = ""
@@ -14,10 +14,25 @@ class OllamaConfig(BaseModel):
     base_url: str = "http://localhost:11434"
     model: str = "llama3"
 
+class OpenAICompatibleConfig(BaseModel):
+    """For OpenAI-compatible APIs like:
+    - 通义千问 (https://dashscope.aliyun.com/compatibility/v1)
+    - 文心一言 (https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat)
+    - Claude Anthropic (via openai proxy)
+    - Gemini Google (via openai proxy)
+    - 豆包 Doubao (bytedance)
+    - 讯飞星火
+    """
+    api_key: str = ""
+    model: str = ""
+    base_url: str = ""
+    extra_headers: Dict[str, str] = Field(default_factory=dict)
+
 class AIConfig(BaseModel):
     provider: AIProvider = "openai"
     openai: OpenAIConfig = OpenAIConfig()
     ollama: OllamaConfig = OllamaConfig()
+    openai_compatible: OpenAICompatibleConfig = OpenAICompatibleConfig()
 
 class ConnectionConfig(BaseModel):
     name: str
