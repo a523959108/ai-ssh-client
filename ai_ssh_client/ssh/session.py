@@ -1,5 +1,6 @@
 import select
 import threading
+import time
 from typing import Optional, Callable
 import paramiko
 from .connection import SSHConnection
@@ -9,8 +10,11 @@ class SSHSession:
         self.connection = connection
         self.session: Optional[paramiko.Channel] = None
         self.output_callback: Optional[Callable[[str], None]] = None
+        self.command_complete_callback: Optional[Callable[[], None]] = None
+        self._last_output_time = 0
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._monitor_thread: Optional[threading.Thread] = None
 
     def start(self, width: int = 80, height: int = 24) -> bool:
         """Start the SSH session"""

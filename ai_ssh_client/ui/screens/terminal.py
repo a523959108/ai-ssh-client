@@ -2,7 +2,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import (
     Static, Input, TextArea, Button, Label, 
-    Footer, Header, Horizontal, Vertical, Container
+    Footer, Header, Horizontal, Vertical, Container, ProgressBar
 )
 from textual.containers import Horizontal
 from ai_ssh_client.config.settings import ConfigManager, ConnectionConfig
@@ -10,6 +10,12 @@ from ai_ssh_client.ssh.connection import SSHConnection
 from ai_ssh_client.ssh.session import SSHSession
 from ai_ssh_client.ai import create_ai_client
 from ai_ssh_client.ai.base import BaseAIClient
+from ai_ssh_client.ai.planner import (
+    generate_plan, ExecutionPlan, PlanStep, get_next_step, 
+    get_plan_status, is_plan_complete, mark_current_step_done,
+    mark_current_step_failed
+)
+from typing import Optional
 
 class TerminalScreen(Screen):
     """Main SSH terminal screen with AI panel"""
@@ -37,7 +43,7 @@ class TerminalScreen(Screen):
     }
 
     #terminal-output {
-        height: 90%;
+        height: 85%;
         border: solid blue;
     }
 
@@ -46,8 +52,12 @@ class TerminalScreen(Screen):
     }
 
     #ai-output {
-        height: 80%;
+        height: 60%;
         border: solid yellow;
+    }
+
+    #ai-goal-input {
+        height: 10%;
     }
 
     #ai-command-input {
@@ -58,8 +68,24 @@ class TerminalScreen(Screen):
         height: 10%;
     }
 
+    #ai-buttons-single {
+        height: 10%;
+    }
+
+    #status-text {
+        width: 100%;
+        height: 100%;
+        content-align: left middle;
+    }
+
     Button {
         width: 1fr;
+    }
+
+    Static#status-text {
+        width: 100%;
+        height: 100%;
+        content-align: left middle;
     }
     """
 
@@ -68,26 +94,39 @@ class TerminalScreen(Screen):
         self.connection_config = connection_config
         self.config_manager = config_manager
         self.connection = SSHConnection(connection_config)
-        self.session: SSHSession | None = None
-        self.ai_client: BaseAIClient | None = create_ai_client(config_manager.config)
+        self.session = None  # type: Optional[SSHSession]
+        self.ai_client = None  # type: Optional[BaseAIClient]
+        self.ai_client = create_ai_client(config_manager.config)
         self.ai_visible = False
+        self.automation_plan = None  # type: Optional[ExecutionPlan]
+        self.auto_executing: bool = False
+        self._buffer: str = ""
+        self._current_step = None  # type: Optional[PlanStep]
+        self._pending_command: str = ""
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Horizontal(
             Container(
                 TextArea(id="terminal-output", read_only=True),
+                Static(id="status-text", "Ready"),
                 Input(id="terminal-input", placeholder="Type command here..."),
                 id="terminal-container"
             ),
             Container(
                 TextArea(id="ai-output", read_only=True, placeholder="AI responses will appear here"),
-                Input(id="ai-command-input", placeholder="Describe what you want in natural language..."),
+                Input(id="ai-goal-input", placeholder="Describe what you want to do (Automated Planning)..."),
+                Horizontal(
+                    Button("Generate Plan", id="generate-plan"),
+                    Button("Start Auto", id="start-auto"),
+                    Button("Step by Step", id="step-mode"),
+                    id="ai-buttons"
+                ),
                 Horizontal(
                     Button("Generate", id="generate-command"),
                     Button("Explain", id="explain-command"),
                     Button("Troubleshoot", id="troubleshoot"),
-                    id="ai-buttons"
+                    id="ai-buttons-single"
                 ),
                 id="ai-panel"
             ),
@@ -124,6 +163,9 @@ class TerminalScreen(Screen):
         widget.text = current + text
         widget.scroll_end()
 
+        if self.auto_executing and self.automation_plan and self._current_step:
+            self._buffer += text
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission"""
         if event.input.id == "terminal-input":
@@ -133,9 +175,12 @@ class TerminalScreen(Screen):
         elif event.input.id == "ai-command-input":
             self._generate_ai_command(event.value)
             event.value = ""
+        elif event.input.id == "ai-goal-input":
+            self._generate_execution_plan(event.value)
+            event.value = ""
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle AI button presses"""
+        """Handle button presses"""
         if event.button.id == "generate-command":
             input_widget = self.query_one("#ai-command-input", Input)
             if input_widget.value:
@@ -145,6 +190,102 @@ class TerminalScreen(Screen):
             self._explain_current_command()
         elif event.button.id == "troubleshoot":
             self._troubleshoot_current_error()
+        elif event.button.id == "generate-plan":
+            input_widget = self.query_one("#ai-goal-input", Input)
+            if input_widget.value:
+                self._generate_execution_plan(input_widget.value)
+                input_widget.value = ""
+        elif event.button.id == "start-auto":
+            self._start_auto_execution()
+        elif event.button.id == "step-mode":
+            self._execute_next_step()
+
+    def _update_status(self, text: str) -> None:
+        """Update status bar text"""
+        status_widget = self.query_one("#status-text", Static)
+        status_widget.update(text)
+
+    def _generate_execution_plan(self, user_goal: str) -> None:
+        """Generate execution plan from user goal"""
+        if not self.ai_client:
+            self._set_ai_output("AI client not configured. Please check your settings.")
+            return
+
+        self._set_ai_output("Generating execution plan...")
+        terminal_output = self.query_one("#terminal-output", TextArea).text
+        system_info = terminal_output[-1000:] if terminal_output else ""
+
+        plan = generate_plan(self.ai_client, user_goal, system_info)
+        if not plan:
+            self._set_ai_output("Failed to generate plan. Please try again.")
+            return
+
+        self.automation_plan = plan
+        self._display_plan(plan)
+        self._update_status(f"Plan ready: {plan.goal} - {len(plan.steps)} steps")
+        self._toggle_ai_panel(True)
+
+    def _display_plan(self, plan: ExecutionPlan) -> None:
+        """Display the generated plan"""
+        output = f"Goal: {plan.goal}\n\nGenerated Plan:\n"
+        for i, step in enumerate(plan.steps, 1):
+            output += f"{i}. [{step.status}] {step.description}\n   Command: `{step.command}`\n\n"
+        output += "Click 'Start Auto' for automatic execution, or 'Step by Step' to execute one step at a time."
+        self._set_ai_output(output)
+
+    def _start_auto_execution(self) -> None:
+        """Start automatic execution of the plan"""
+        if not self.automation_plan:
+            self._set_ai_output("No plan generated yet. Please generate a plan first.")
+            return
+        
+        self.auto_executing = True
+        self._execute_next_step()
+
+    def _execute_next_step(self) -> None:
+        """Execute the next step in the plan"""
+        if not self.automation_plan:
+            return
+
+        if is_plan_complete(self.automation_plan):
+            self._finish_plan()
+            return
+
+        step = get_next_step(self.automation_plan)
+        if not step:
+            self._finish_plan()
+            return
+
+        self._current_step = step
+        step.status = "running"
+        self._update_status(get_plan_status(self.automation_plan))
+        self._display_plan(self.automation_plan)
+
+        if self.session:
+            self._buffer = ""
+            self.session.send_input(step.command + "\n")
+
+    def _check_command_complete(self) -> None:
+        """Called after command finishes to mark step complete"""
+        if self.automation_plan and self._current_step:
+            mark_current_step_done(self.automation_plan, self._buffer)
+            self._display_plan(self.automation_plan)
+            self._update_status(get_plan_status(self.automation_plan))
+            
+            if self.auto_executing and not is_plan_complete(self.automation_plan):
+                self.app.call_later(1.5, self._execute_next_step)
+            elif is_plan_complete(self.automation_plan):
+                self._finish_plan()
+
+    def _finish_plan(self) -> None:
+        """Plan execution finished"""
+        self.auto_executing = False
+        if self.automation_plan:
+            done = sum(1 for step in self.automation_plan.steps if step.status == "done")
+            failed = sum(1 for step in self.automation_plan.steps if step.status == "failed")
+            total = len(self.automation_plan.steps)
+            self._update_status(f"✓ Completed: {done}/{total} steps, {failed} failed - {self.automation_plan.goal}")
+            self._set_ai_output(f"Plan completed!\n\nStatistics:\n- Total steps: {total}\n- Completed: {done}\n- Failed: {failed}\n\nAll tasks done!")
 
     def _generate_ai_command(self, user_request: str) -> None:
         """Generate command from natural language"""
@@ -209,7 +350,7 @@ class TerminalScreen(Screen):
         output_widget = self.query_one("#ai-output", TextArea)
         output_widget.text = text
 
-    def _toggle_ai_panel(self, visible: bool = None) -> None:
+    def _toggle_ai_panel(self, visible: 'bool | None' = None) -> None:
         """Toggle AI panel visibility"""
         panel = self.query_one("#ai-panel", Container)
         if visible is None:
