@@ -1,0 +1,47 @@
+name: Build DMG
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install py2app
+
+    - name: Build DMG
+      run: |
+        python setup.py py2app
+
+    - name: Create DMG
+      run: |
+        hdiutil create -volname "AI SSH Client" -srcfolder dist/AI\ SSH\ Client.app -ov -format UDZO "AI-SSH-Client-${{ github.ref_name }}.dmg"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: AI-SSH-Client-dmg
+        path: "*.dmg"
+
+    - name: Create Release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: "*.dmg"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

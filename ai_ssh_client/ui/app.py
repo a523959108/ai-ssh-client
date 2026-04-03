@@ -52,11 +52,7 @@ class AISSHApp(App):
 
     def on_mount(self) -> None:
         """Mount the app"""
-        # Replace the placeholder with actual connect screen content
-        pass
-
-    def on_mount(self) -> None:
-        """Mount the app"""
+        self.push_screen(ConnectScreen(self.config_manager))
 
     def connect_to_host(self, connection_config) -> None:
         """Open connection in new tab"""
@@ -65,7 +61,7 @@ class AISSHApp(App):
         tab_name = connection_config.name or f"Session {self.tab_counter}"
         
         # The terminal screen will be pushed within this tab
-        self.app.push_screen(TerminalScreen(connection_config, self.config_manager))
+        self.push_screen(TerminalScreen(connection_config, self.config_manager))
 
     def action_new_tab(self) -> None:
         """Open new connection tab"""

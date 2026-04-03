@@ -114,7 +114,7 @@ class TerminalScreen(Screen):
         yield Horizontal(
             Container(
                 TextArea(id="terminal-output", read_only=True),
-                Static(id="status-text", "Ready"),
+                Static("Ready", id="status-text"),
                 Input(id="terminal-input", placeholder="Type command here..."),
                 id="terminal-container"
             ),

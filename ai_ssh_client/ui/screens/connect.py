@@ -182,9 +182,10 @@ class QuickConnectScreen(Screen):
             host = self.query_one("#host", Input).value
             port = int(self.query_one("#port", Input).value or "22")
             username = self.query_one("#username", Input).value
-            
+             
             conn_config = ConnectionConfig(
                 name="Quick Connect",
+                protocol="ssh",
                 host=host,
                 port=port,
                 username=username,
