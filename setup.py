@@ -7,7 +7,6 @@ APP = ['main.py']
 DATA_FILES = []
 OPTIONS = {
     'argv_emulation': True,
-    'iconfile': 'app_icon.icns',  # If you have an icon
     'plist': {
         'CFBundleName': 'AI SSH Client',
         'CFBundleDisplayName': 'AI SSH Client',
