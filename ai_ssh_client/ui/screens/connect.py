@@ -88,6 +88,11 @@ class NewConnectionScreen(Screen):
                 ], id="auth_type")),
                 Horizontal(Label("Key Path:"), Input(value="~/.ssh/id_rsa", id="key_path")),
                 Horizontal(Label("Cert Path:"), Input(value="~/.ssh/id_rsa-cert.pub", id="cert_path")),
+                Static("Custom Terminal Theme:", classes="section-title"),
+                Horizontal(Label("Foreground:"), Input(value="#ffffff", id="theme-fg")),
+                Horizontal(Label("Background:"), Input(value="#0a0a0a", id="theme-bg")),
+                Horizontal(Label("Font Size:"), Input(value="14", id="font-size")),
+                Horizontal(Label("Font:"), Input(value="Menlo, Monaco, Consolas", id="font-family")),
                 classes="form"
             ),
             Horizontal(
@@ -116,6 +121,20 @@ class NewConnectionScreen(Screen):
         auth_type = self.query_one("#auth_type", Select).value
         key_path = self.query_one("#key_path", Input).value
         cert_path = self.query_one("#cert_path", Input).value
+        
+        # Custom theme
+        fg = self.query_one("#theme-fg", Input).value or "#ffffff"
+        bg = self.query_one("#theme-bg", Input).value or "#0a0a0a"
+        font_size = int(self.query_one("#font-size", Input).value or "14")
+        font_family = self.query_one("#font-family", Input).value or "Menlo, Monaco, Consolas"
+        
+        from ai_ssh_client.config.settings import TerminalThemeConfig
+        custom_theme = TerminalThemeConfig(
+            foreground=fg,
+            background=bg,
+            font_size=font_size,
+            font_family=font_family
+        )
 
         conn = ConnectionConfig(
             name=name,
@@ -125,7 +144,8 @@ class NewConnectionScreen(Screen):
             username=username,
             auth_type=auth_type,
             key_path=key_path,
-            cert_path=cert_path
+            cert_path=cert_path,
+            custom_theme=custom_theme
         )
         self.config_manager.add_connection(conn)
         self.config_manager.save()

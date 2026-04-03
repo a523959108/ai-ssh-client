@@ -165,6 +165,13 @@ class TerminalScreen(Screen):
             else:
                 self.notify("AI client not configured", severity="warning")
 
+        # Apply custom theme if any
+        if self.connection_config.custom_theme:
+            theme = self.connection_config.custom_theme
+            terminal_output = self.query_one("#terminal-output", TextArea)
+            terminal_output.styles.background = theme.background
+            terminal_output.styles.color = theme.foreground
+
     def _on_terminal_output(self, text: str) -> None:
         """Callback for SSH output"""
         widget = self.query_one("#terminal-output", TextArea)
@@ -208,18 +215,19 @@ class TerminalScreen(Screen):
             if input_widget.value:
                 self._generate_execution_plan(input_widget.value)
                 input_widget.value = ""
-         elif event.button.id == "start-auto":
-             self._start_auto_execution()
-         elif event.button.id == "step-mode":
-             self._execute_next_step()
-         elif event.button.id == "favorites":
-             from ai_ssh_client.ui.screens.favorites import FavoritesScreen
-             def on_select = lambda cmd: self._execute_favorite(cmd)
-             self.app.push_screen(FavoritesScreen(self.config_manager, on_select)
-         elif event.button.id == "command-history":
-             self._show_command_history()
-         elif event.button.id == "add-current-fav":
-             self._add_current_to_favorites()
+        elif event.button.id == "start-auto":
+            self._start_auto_execution()
+        elif event.button.id == "step-mode":
+            self._execute_next_step()
+        elif event.button.id == "favorites":
+            from ai_ssh_client.ui.screens.favorites import FavoritesScreen
+            def on_select(cmd):
+                self._execute_favorite(cmd)
+            self.app.push_screen(FavoritesScreen(self.config_manager, on_select))
+        elif event.button.id == "command-history":
+            self._show_command_history()
+        elif event.button.id == "add-current-fav":
+            self._add_current_to_favorites()
 
     def _update_status(self, text: str) -> None:
         """Update status bar text"""
@@ -386,6 +394,6 @@ class TerminalScreen(Screen):
 
     def on_resize(self, event):
         """Handle terminal resize"""
-        if self.session:
+        if self.protocol:
             container = self.query_one("#terminal-container")
-            self.session.resize(container.size.width, container.size.height)
+            self.protocol.resize(container.size.width, container.size.height)
