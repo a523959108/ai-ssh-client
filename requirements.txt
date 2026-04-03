@@ -1,0 +1,13 @@
+# SSH connection
+paramiko>=3.4.0
+
+# Terminal UI
+textual>=0.41.0
+
+# AI integration
+openai>=1.12.0
+requests>=2.31.0
+
+# Configuration
+pydantic>=2.6.0
+pyyaml>=6.0.1

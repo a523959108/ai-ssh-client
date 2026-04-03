@@ -1,0 +1,86 @@
+Screen {
+    background: #0a0a0a;
+}
+
+.title {
+    content-align: center middle;
+    font-size: 1.5em;
+    font-weight: bold;
+    padding: 1;
+}
+
+#connect-container {
+    width: 80%;
+    height: 100%;
+    margin: 0 auto;
+    padding: 1;
+}
+
+#connection-list {
+    height: 80%;
+    border: solid green;
+    margin: 1 0;
+}
+
+.empty {
+    height: 80%;
+    content-align: center middle;
+    color: gray;
+}
+
+.buttons {
+    height: 10%;
+    align: center middle;
+}
+
+.buttons Button {
+    width: 30%;
+    margin: 0 2;
+}
+
+.form {
+    margin: 1 0;
+}
+
+.form Horizontal {
+    height: 3;
+    margin: 0 1;
+    align: center middle;
+}
+
+.form Label {
+    width: 15%;
+}
+
+.form Input, .form Select {
+    width: 85%;
+}
+
+#main-container {
+    height: 100%;
+}
+
+#terminal-container {
+    height: 100%;
+}
+
+#terminal-output {
+    border: solid #333;
+}
+
+#terminal-input {
+    border-top: solid #333;
+}
+
+#ai-panel {
+    background: #111111;
+    border-left: solid #2ecc71;
+}
+
+#ai-output {
+    border-bottom: solid #333;
+}
+
+#ai-command-input {
+    border-bottom: solid #333;
+}
