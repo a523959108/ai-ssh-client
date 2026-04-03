@@ -28,13 +28,5 @@ setup(
     app=APP,
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
-    setup_requires=['py2app'],
-    install_requires=[
-        'paramiko>=3.4.0',
-        'textual>=0.41.0',
-        'openai>=1.12.0',
-        'requests>=2.31.0',
-        'pydantic>=2.6.0',
-        'pyyaml>=6.0.1',
-    ]
+    setup_requires=['py2app']
 )
