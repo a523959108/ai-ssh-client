@@ -11,10 +11,10 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: '3.11'
 
@@ -33,14 +33,14 @@ jobs:
         hdiutil create -volname "AI SSH Client" -srcfolder dist/AI\ SSH\ Client.app -ov -format UDZO "AI-SSH-Client-${{ github.ref_name }}.dmg"
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: AI-SSH-Client-dmg
         path: "*.dmg"
 
     - name: Create Release
       if: github.event_name == 'push'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: "*.dmg"
       env:
